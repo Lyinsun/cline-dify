@@ -146,15 +146,20 @@ app.post("/v1/chat/completions", async (req, res) => {
       body: JSON.stringify(requestBody),
     });
 
-    let isResponseEnded = false;
-
     if (stream) {
       res.setHeader("Content-Type", "text/event-stream");
       const stream = resp.body;
       let buffer = "";
       let isFirstChunk = true;
+      let isResponseEnded = false;
+
+      res.on('close', () => {
+        isResponseEnded = true;
+        stream.destroy();
+      });
 
       stream.on("data", (chunk) => {
+        if (isResponseEnded) return;
 
         buffer += chunk.toString();
         let lines = buffer.split("\n");
@@ -214,53 +219,55 @@ app.post("/v1/chat/completions", async (req, res) => {
               );
             }
           } } else if (chunkObj.event === "workflow_finished" || chunkObj.event === "message_end") {
-            const chunkId = `chatcmpl-${Date.now()}`;
-            const chunkCreated = chunkObj.created_at;
             if (!isResponseEnded) {
-            res.write(
-              "data: " +
-                JSON.stringify({
-                  id: chunkId,
-                  object: "chat.completion.chunk",
-                  created: chunkCreated,
-                  model: data.model,
-                  choices: [
-                    {
-                      index: 0,
-                      delta: {},
-                      finish_reason: "stop",
-                    },
-                  ],
-                }) +
-                "\n\n"
-            );
-          }
-          if (!isResponseEnded) {
-            res.write("data: [DONE]\n\n");
-          }
-
-            res.end();
-            isResponseEnded = true;
+              const chunkId = `chatcmpl-${Date.now()}`;
+              res.write(
+                "data: " +
+                  JSON.stringify({
+                    id: chunkId,
+                    object: "chat.completion.chunk",
+                    created: chunkObj.created_at,
+                    model: data.model,
+                    choices: [
+                      {
+                        index: 0,
+                        delta: {},
+                        finish_reason: "stop",
+                      },
+                    ],
+                  }) +
+                  "\n\n"
+              );
+              res.write("data: [DONE]\n\n");
+              res.end();
+              isResponseEnded = true;
+              stream.destroy();
+            }
           } else if (chunkObj.event === "agent_thought") {
           } else if (chunkObj.event === "ping") {
           } else if (chunkObj.event === "error") {
-            console.error(`Error: ${chunkObj.code}, ${chunkObj.message}`);
-            res
-              .status(500)
-              .write(
-                `data: ${JSON.stringify({ error: chunkObj.message })}\n\n`
-              );
-              
             if (!isResponseEnded) {
-            res.write("data: [DONE]\n\n");
+              console.error(`Error: ${chunkObj.code}, ${chunkObj.message}`);
+              res.write(`data: ${JSON.stringify({ error: chunkObj.message })}\n\n`);
+              res.write("data: [DONE]\n\n");
+              res.end();
+              isResponseEnded = true;
+              stream.destroy();
             }
-
-            res.end();
-            isResponseEnded = true;
           }
         }
 
         buffer = lines[lines.length - 1];
+      });
+
+      stream.on('error', (error) => {
+        if (!isResponseEnded) {
+          console.error('Stream error:', error);
+          res.write(`data: ${JSON.stringify({ error: "Stream error occurred" })}\n\n`);
+          res.write("data: [DONE]\n\n");
+          res.end();
+          isResponseEnded = true;
+        }
       });
     } else {
       let result = "";
