@@ -12,4 +12,9 @@ DIFY_API_URL为dify的api地址，默认为https://dify.lininn.cn/v1，修改为
 baseurl为http://127.0.0.1:3005/v1
 API key设置dify中的api Key即可
 配置完成后，在cline中问答即可
+
 ![image](https://github.com/user-attachments/assets/d8251b01-f4e1-4ca9-9167-5d7d572b3828)
+
+记得开启文件权限：
+
+![image](https://github.com/user-attachments/assets/552e1bf7-80ff-47b0-bc26-9e60e7163ad2)
