@@ -18,3 +18,6 @@ API key设置dify中的api Key即可
 记得开启文件权限：
 
 ![image](https://github.com/user-attachments/assets/552e1bf7-80ff-47b0-bc26-9e60e7163ad2)
+
+
+<img width="462" alt="image" src="https://github.com/user-attachments/assets/ca3e04ab-cf04-4f31-b4dd-bc64deab3d73" />
