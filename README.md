@@ -1,4 +1,19 @@
 # cline-dify
+First, install the Clime plugin in VSCode. Clime uses the Dify platform's API to create files and perform AI Q&A, reducing costs.
+
+Usage: Modify the .env.example file and change the configuration. Set DIFY_API_URL to the Dify API address. The default is https://dify.d-1.top/v1, but you can change it to your own Dify address.
+
+After configuring, run the following commands:
+
+pnpm i && pnpm run start
+
+Then, in Clime, select "OpenAi Compatible" in the API Provider section. Set the baseurl to http://127.0.0.1:3005/v1. The modelId can be set to any value. For the API key, use the API key from your Dify account.
+
+Once the configuration is complete, you can start using the Q&A feature in Clime.
+
+Let me know if you need further clarifications or modifications!
+
+中文：
 首先vscode中安装cline插件
 cline使用dify平台的api进行创建文件以及ai问答，降低成本
 
