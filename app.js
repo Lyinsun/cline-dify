@@ -17,7 +17,9 @@ function generateId() {
   return result;
 }
 const app = express();
-app.use(bodyParser.json());
+const bodyParserLimit = process.env.BODY_PARSER_LIMIT || '1mb'; // 如果未设置，则默认为 10mb
+app.use(bodyParser.json({ limit: bodyParserLimit }));
+app.use(bodyParser.urlencoded({ limit: bodyParserLimit, extended: true }));
 const botType = process.env.BOT_TYPE || 'Chat';
 const inputVariable = process.env.INPUT_VARIABLE || '';
 const outputVariable = process.env.OUTPUT_VARIABLE || '';

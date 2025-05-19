@@ -12,7 +12,7 @@ Then, in Clime, select "OpenAi Compatible" in the API Provider section. Set the 
 Once the configuration is complete, you can start using the Q&A feature in Clime.
 
 Let me know if you need further clarifications or modifications!
-
+# 介绍
 中文：
 首先vscode中安装cline插件
 cline使用dify平台的api进行创建文件以及ai问答，降低成本
@@ -21,14 +21,17 @@ cline使用dify平台的api进行创建文件以及ai问答，降低成本
 修改.env.example，修改里面的配置
 DIFY_API_URL为dify的api地址，默认为https://dify.d-1.top/v1，修改为自己的dify地址
 
+## 安装pnpm后运行转发服务器
 配置后运行 pnpm i &&  pnpm run start
 
 之后在cline 中api Provider中选择OpenAi Compatible
 baseurl为http://127.0.0.1:3005/v1
-modelId任意填写可以为dify
-API key设置dify中的api Key即可
+之后需要具体参考env文件。
+```env
+modelId: 任意填写，不会影响寻找
+API key: 设置dify中的api Key即可,需要是对应应用的API。
+```
 配置完成后，在cline中问答即可
-
 ![image](https://github.com/user-attachments/assets/d8251b01-f4e1-4ca9-9167-5d7d572b3828)
 
 记得开启文件权限：
