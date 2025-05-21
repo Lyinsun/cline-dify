@@ -2,6 +2,8 @@ import express from "express";
 import bodyParser from "body-parser";
 import dotenv from "dotenv";
 import fetch from "node-fetch";
+import fs from "fs";
+import path from "path";
 dotenv.config();
 
 
@@ -150,20 +152,43 @@ app.post("/v1/chat/completions", async (req, res) => {
 
     if (stream) {
       res.setHeader("Content-Type", "text/event-stream");
-      const stream = resp.body;
+      const difyStream = resp.body; // Renamed to avoid conflict with outer scope stream variable
       let buffer = "";
       let isFirstChunk = true;
       let isResponseEnded = false;
 
+      // Ensure log directory exists
+      const logDir = 'log';
+      if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+      }
+
+      const difyLogStream = fs.createWriteStream(path.join(logDir, 'dify_sse.log'), { flags: 'a' });
+      const openaiLogStream = fs.createWriteStream(path.join(logDir, 'openai_sse.log'), { flags: 'a' });
+
+      const closeLogStreams = () => {
+        if (difyLogStream && !difyLogStream.closed) {
+          difyLogStream.end();
+        }
+        if (openaiLogStream && !openaiLogStream.closed) {
+          openaiLogStream.end();
+        }
+      };
+
       res.on('close', () => {
         isResponseEnded = true;
-        stream.destroy();
+        if (difyStream && typeof difyStream.destroy === 'function') {
+          difyStream.destroy();
+        }
+        closeLogStreams();
       });
 
-      stream.on("data", (chunk) => {
+      difyStream.on("data", (chunk) => {
         if (isResponseEnded) return;
 
-        buffer += chunk.toString();
+        const chunkString = chunk.toString();
+        difyLogStream.write(`[${new Date().toISOString()}] Dify RAW Chunk: ${chunkString}\n`);
+        buffer += chunkString;
         let lines = buffer.split("\n");
 
         for (let i = 0; i < lines.length - 1; i++) {
@@ -200,8 +225,7 @@ app.post("/v1/chat/completions", async (req, res) => {
               const chunkCreated = chunkObj.created_at;
               
               if (!isResponseEnded) {
-              res.write(
-                "data: " +
+              const openaiChunkString = "data: " +
                   JSON.stringify({
                     id: chunkId,
                     object: "chat.completion.chunk",
@@ -217,14 +241,14 @@ app.post("/v1/chat/completions", async (req, res) => {
                       },
                     ],
                   }) +
-                  "\n\n"
-              );
+                  "\n\n";
+              openaiLogStream.write(`[${new Date().toISOString()}] OpenAI Formatted Chunk: ${openaiChunkString}`);
+              res.write(openaiChunkString);
             }
           } } else if (chunkObj.event === "workflow_finished" || chunkObj.event === "message_end") {
             if (!isResponseEnded) {
               const chunkId = `chatcmpl-${Date.now()}`;
-              res.write(
-                "data: " +
+              const finishChunkString = "data: " +
                   JSON.stringify({
                     id: chunkId,
                     object: "chat.completion.chunk",
@@ -238,23 +262,40 @@ app.post("/v1/chat/completions", async (req, res) => {
                       },
                     ],
                   }) +
-                  "\n\n"
-              );
-              res.write("data: [DONE]\n\n");
+                  "\n\n";
+              const doneSignalString = "data: [DONE]\n\n";
+
+              openaiLogStream.write(`[${new Date().toISOString()}] OpenAI Finish Chunk: ${finishChunkString}`);
+              openaiLogStream.write(`[${new Date().toISOString()}] OpenAI DONE Signal: ${doneSignalString}`);
+
+              res.write(finishChunkString);
+              res.write(doneSignalString);
               res.end();
               isResponseEnded = true;
-              stream.destroy();
+              if (difyStream && typeof difyStream.destroy === 'function') { // Ensure difyStream is used
+                difyStream.destroy();
+              }
+              closeLogStreams();
             }
           } else if (chunkObj.event === "agent_thought") {
           } else if (chunkObj.event === "ping") {
           } else if (chunkObj.event === "error") {
             if (!isResponseEnded) {
               console.error(`Error: ${chunkObj.code}, ${chunkObj.message}`);
-              res.write(`data: ${JSON.stringify({ error: chunkObj.message })}\n\n`);
-              res.write("data: [DONE]\n\n");
+              const errorChunkString = `data: ${JSON.stringify({ error: chunkObj.message })}\n\n`;
+              const doneSignalString = "data: [DONE]\n\n";
+
+              openaiLogStream.write(`[${new Date().toISOString()}] OpenAI Error Chunk: ${errorChunkString}`);
+              openaiLogStream.write(`[${new Date().toISOString()}] OpenAI DONE Signal (Error): ${doneSignalString}`);
+
+              res.write(errorChunkString);
+              res.write(doneSignalString);
               res.end();
               isResponseEnded = true;
-              stream.destroy();
+              if (difyStream && typeof difyStream.destroy === 'function') { // Ensure difyStream is used
+                difyStream.destroy();
+              }
+              closeLogStreams();
             }
           }
         }
@@ -262,13 +303,18 @@ app.post("/v1/chat/completions", async (req, res) => {
         buffer = lines[lines.length - 1];
       });
 
-      stream.on('error', (error) => {
+      difyStream.on('error', (error) => { // Changed stream to difyStream
         if (!isResponseEnded) {
           console.error('Stream error:', error);
-          res.write(`data: ${JSON.stringify({ error: "Stream error occurred" })}\n\n`);
-          res.write("data: [DONE]\n\n");
+          const errorString = `data: ${JSON.stringify({ error: "Stream error occurred" })}\n\n`;
+          const doneSignalString = "data: [DONE]\n\n";
+          openaiLogStream.write(`[${new Date().toISOString()}] OpenAI Stream Error: ${errorString}`);
+          openaiLogStream.write(`[${new Date().toISOString()}] OpenAI DONE Signal (Stream Error): ${doneSignalString}`);
+          res.write(errorString);
+          res.write(doneSignalString);
           res.end();
           isResponseEnded = true;
+          closeLogStreams();
         }
       });
     } else {
