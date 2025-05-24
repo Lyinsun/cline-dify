@@ -425,4 +425,6 @@ app.post("/v1/chat/completions", async (req, res) => {
   }
 });
 
+
 app.listen(process.env.PORT || 3005);
+console.log("可以通过：http://127.0.0.1:"+process.env.PORT + " 进行转发")
