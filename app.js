@@ -141,14 +141,30 @@ app.post("/v1/chat/completions", async (req, res) => {
       };
     }
     // console.log(queryString);
-    const resp = await fetch(process.env.DIFY_API_URL + apiPath, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${authHeader.split(" ")[1]}`,
-      },
-      body: JSON.stringify(requestBody),
-    });
+    let resp;
+    try {
+      resp = await fetch(process.env.DIFY_API_URL + apiPath, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${authHeader.split(" ")[1]}`,
+        },
+        body: JSON.stringify(requestBody),
+      });
+    } catch (fetchError) {
+      if (fetchError.type === 'system' && fetchError.code === 'ECONNRESET') {
+        console.error("FetchError ECONNRESET connecting to Dify:", fetchError);
+        return res.status(503).json({ // 使用 503 Service Unavailable
+          error: {
+            message: "连接 Dify 服务失败 (ECONNRESET)。请检查您的网络或 Dify 服务状态，并稍后重试。",
+            type: "dify_connection_error",
+            code: "ECONNRESET"
+          }
+        });
+      }
+      // 对于其他 fetch 错误，重新抛出，由外部的 try-catch 块处理
+      throw fetchError;
+    }
 
     if (stream) {
       res.setHeader("Content-Type", "text/event-stream");
@@ -421,8 +437,22 @@ app.post("/v1/chat/completions", async (req, res) => {
       });
     }
   } catch (error) {
-    console.error("Error:", error);
+    console.error("Error in /v1/chat/completions:", error); // 为日志添加路由信息以方便调试
+    if (!res.headersSent) { // 检查响应头是否已发送
+      res.status(500).json({
+        error: {
+          message: "处理您的请求时发生内部服务器错误。请稍后重试。",
+          type: "internal_server_error"
+          // 根据需要，可以在开发环境中包含 error.message 以方便调试，
+          // 但在生产环境中需谨慎，避免泄露敏感信息。
+          // details: process.env.NODE_ENV === 'development' ? error.message : undefined
+        }
+      });
+    }
   }
 });
 
-app.listen(process.env.PORT || 3005);
+const port = process.env.PORT || 3005;
+app.listen(port, () => {
+  console.log(`服务运行在 http://localhost:${port}`);
+});
