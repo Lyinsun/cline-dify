@@ -453,6 +453,24 @@ app.post("/v1/chat/completions", async (req, res) => {
 });
 
 const port = process.env.PORT || 3005;
+import os from "os";
 app.listen(port, () => {
-  console.log(`服务运行在 http://localhost:${port}`);
+  console.log(`服务运行在 http://localhost:${port}/v1`);
+  // 获取本机局域网IP地址
+  const nets = os.networkInterfaces();
+  let localIp = '';
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name]) {
+      if (net.family === 'IPv4' && !net.internal) {
+        localIp = net.address;
+        break;
+      }
+    }
+    if (localIp) break;
+  }
+  if (localIp) {
+    console.log(`本机局域网地址: http://${localIp}:${port}/v1`);
+  } else {
+    console.log('未能获取本机局域网IP地址');
+  }
 });
